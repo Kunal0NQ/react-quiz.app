@@ -1,90 +1,101 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import app from "./firebaseConfig";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Quiz from "./pages/Quiz";
-import Result from "./pages/Result";
-import AdminDashboard from "./pages/AdminDashboard";
-import UploadQuizes from "./pages/UploadQuizes";
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ToastProvider from "./components/Toasts/ToastProvider";
+import NavLayout from "./components/NavLayout";
+import PrivateRoute from "./components/PrivateRoute";
+import AuthPage from "./components/AuthPage";
+import UserProfile from "./components/UserProfile";
+import QuizDetailPage from "./components/QuizDetailPage";
+import AdminRoute from "./components/AdminRoute";
+import AdminLayout from "./components/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ManageQuizzes from "./pages/admin/ManageQuizzes";
+import ApproveQuizzes from "./pages/admin/ApproveQuizzes";
+import UploadQuiz from "./pages/admin/UploadQuiz";
+import Home from "./pages/Home";
+import QuizPage from "./pages/QuizPage";
+import TopicPage from "./pages/TopicPage";
+import TopicDetail from "./components/TopicDetail";
+import QuizStartPage from "./components/QuizStartPage";
+import QuizResultPage from "./components/QuizResultPage";
 import AddQuiz from "./pages/AddQuiz";
-import EditQuiz from "./pages/EditQuiz";
-import Signup from "./pages/Signup"
-import { Toaster } from "sonner";
+import MyQuizzes from "./pages/MyQuizzes";
+import UploadUserQuiz from "./pages/UploadUserQuiz"
 import NotFound from "./pages/NotFound";
+import Layout from "./components/Layout";
 
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [quizAttempts, setQuizAttempts] = useState([]);
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          if (!userData.role) {
-            console.error("User role not found");
-            setUser(null); // Prevents login without a role
-          } else {
-            setUser({ uid: user.uid, email: user.email, role: userData.role });
-          }
-        } else {
-          console.error("User document not found in Firestore");
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setQuizAttempts([]); // Clear quiz attempts
-    } catch (error) {
-      console.error("Logout failed:", error.message);
-    }
-  };
-
-  if (loading) return <p>Loading...</p>;
+function AppRoutes() {
+  const { user } = useAuth();
 
   return (
-    <>
-      <Toaster position="top-right" /> {/* Global toast container */}
-      <Router>
-        <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Login setUser={setUser} />} />
-          <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
-          <Route path="/dashboard" element={user ? <Dashboard user={user} onLogout={handleLogout} quizAttempts={quizAttempts} setQuizAttempts={setQuizAttempts} /> : <Navigate to="/" />} />
-          {/* <Route path="/dashboard" element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} /> */}
-          <Route path="/quiz/:quizId" element={user ? <Quiz /> : <Navigate to="/" />} />
-          <Route path="/result/:quizId" element={user ? <Result /> : <Navigate to="/" />} />
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
+      <Route path="/login" element={!user ? <AuthPage /> : <Navigate to="/home" />} />
+     
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={user?.role === "admin" ? <AdminDashboard onLogout={handleLogout} /> : <Navigate to="/" />} />
-          <Route path="/admin/uploadquizes" element={user?.role === "admin" ? <UploadQuizes /> : <Navigate to="/" />} />
-          <Route path="/admin/add-quiz" element={user?.role === "admin" ? <AddQuiz /> : <Navigate to="/" />} />
-          <Route path="/edit-quiz/:quizId" element={user?.role === "admin" ? <EditQuiz /> : <Navigate to="/" />} />
-        
-          {/* 404 Not Found Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
-    </>
+      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+    
+        <Route index element={<Home />} />
+        <Route path="home" element={<Home />} />
+        <Route path=":username/profile"      element={<UserProfile />} />
+        <Route path=":username/my-quizzes"   element={<MyQuizzes />} /> 
+        <Route path="quizzes"                element={<QuizPage />} /> 
+        <Route path="quizzes/:quizId"        element={<QuizDetailPage />} /> 
+        <Route path="topics" element={<TopicPage />} />
+        <Route path="topic/:topicId"         element={<TopicDetail />} />
+         
+      </Route>
+
+      
+      <Route path="/" element={<PrivateRoute><NavLayout /></PrivateRoute>}>
+        <Route path="quizzes/:quizId/start"  element={<QuizStartPage />} />
+        <Route path="quizzes/:quizId/result" element={<QuizResultPage />} />
+        <Route path="/create-quiz"           element={<AddQuiz />}/>
+        <Route path="/upload-quiz"           element={<UploadUserQuiz />}/>
+      </Route>
+
+  
+      <Route path="/admin" element={<AdminRoute> <AdminLayout /> </AdminRoute> } >
+
+        <Route index  element={<Navigate to="dashboard" />} />
+
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="upload"    element={<UploadQuiz />} />
+        <Route path="approve"   element={<ApproveQuizzes />} />
+        <Route path="manage"    element={<ManageQuizzes />} />
+
+      </Route>
+
+      {/* 404 */}
+      <Route path="*" element={<NotFound />} />
+      <Route path="/unauthorized"
+        element={
+          <h2 className="text-center mt-10 text-xl text-red-600">
+            403 – Not Authorized
+          </h2>
+        }
+      />
+    </Routes>
   );
 }
+
+const App = () => {
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </ToastProvider>
+  );
+};
 
 export default App;
